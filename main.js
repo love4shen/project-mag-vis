@@ -18,8 +18,13 @@ const svg = d3.select("body").append("svg")
 let node = svg.selectAll(".node");
 let link = svg.selectAll(".link");
 let label = svg.selectAll('.label')
+const showTime = svg.append('text')
+.attr('class', 'showTime')
+.text('loading...')
+.attr('x', 20)
+.attr('y', 20);
 
-function start() {
+function start(time) {
   link = link.data(force.links(), function (d) { return d.source.id + "-" + d.target.id; });
   link.enter().insert("line", ".node").attr("class", "link");
   link.exit().remove();
@@ -28,7 +33,7 @@ function start() {
   node.enter()
     .append("circle")
     .attr('data-id', (d) => d.id)
-    .attr("class", 'node')
+    .attr("class", (d) => d.isFile ? 'node node-file' : 'node')
     .attr("r", (d) => {
       if (d.isFile) return Math.sqrt(d.amount) / 3;
       return 4;
@@ -59,6 +64,17 @@ function start() {
     })
   label.exit().remove();
 
+  const timeObj = new Date(time*1000);
+  const year = timeObj.getFullYear();
+  const month = timeObj.getMonth();
+  const day = timeObj.getDay();
+  const hour = timeObj.getHours();
+  const minute = timeObj.getMinutes();
+
+  const toTwoDigit = (n) => n < 10 ? `0${n}` : `${n}`;
+
+  showTime.text(`${toTwoDigit(year)}-${toTwoDigit(month)}-${toTwoDigit(day)} ${toTwoDigit(hour)}:${toTwoDigit(minute)}`);
+
   force.start();
 }
 
@@ -75,6 +91,17 @@ function tick() {
     .attr('y', (d) => d.y);
 }
 
+const colorInterpret = d3.interpolateHsl(d3.hsl(d3.color('#FFCDD2')), d3.hsl(d3.color('#C62828')));;
+
+
+let i = 0;
+
+setInterval(() => {
+  d3.selectAll('.node-file').each(function () {
+    d3.select(this)[0][0].setAttribute('fill', colorInterpret(Math.abs(Math.sin((i++/1000)*Math.PI))))
+  })
+}, 100)
+
 d3.json("miserables.json", function (err, datum) {
   if (err) throw "Error";
 
@@ -82,10 +109,13 @@ d3.json("miserables.json", function (err, datum) {
   let i = 0;
   const nodesMap = {};
   const linksUnique = new Set();
+  const firstTime = Number(timeSpan[0]);
+  const lastTime = Number(timeSpan[timeSpan.length - 1]);
+  const timeSpace = 60000 / (lastTime - firstTime);
 
   for (let i = 0; i < timeSpan.length; i++) {
-    const commit = timeSpan[i];
-    const { committer: c, data: d } = trees[commit];
+    const time = Number(timeSpan[i]);
+    const { committer: c, data: d } = trees[time];
     const { nodes: ns, links: ls } = d;
     setTimeout(() => {
       ns.forEach(n => {
@@ -115,7 +145,7 @@ d3.json("miserables.json", function (err, datum) {
         }
       });
 
-      start();
-    }, i * 100);
+      start(time);
+    }, timeSpace*(time - firstTime));
   }
 });
